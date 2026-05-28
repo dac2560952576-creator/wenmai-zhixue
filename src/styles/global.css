@@ -1,0 +1,272 @@
+/* ====== 文脉智学 - 新中式设计令牌 ====== */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap');
+
+:root {
+  /* 主色 - 青瓷 */
+  --celadon: #6BA898;
+  --celadon-light: #A8D5C2;
+  --celadon-dark: #4A8B7A;
+  --celadon-pale: #E8F3ED;
+
+  /* 墨色系 */
+  --ink-dark: #1A1A1A;
+  --ink-mid: #595959;
+  --ink-light: #8C8C8C;
+  --ink-disabled: #BFBFBF;
+
+  /* 背景系 */
+  --paper: #FBF9F5;
+  --paper-warm: #FDF8F0;
+  --paper-white: #FAFAF7;
+  --card-bg: #FFFFFF;
+  --border-color: #EDE9E2;
+
+  /* 点缀色 */
+  --silk-gold: #B8956A;
+  --silk-gold-light: #E8D5A3;
+  --vermilion: #C04851;
+  --indigo: #425066;
+
+  /* 渐变 */
+  --gradient-brand: linear-gradient(135deg, #6BA898, #4A8B7A);
+  --gradient-warm: linear-gradient(135deg, #FDF8F0, #F5EDE0);
+  --gradient-card-placeholder: linear-gradient(135deg, #E8F3ED, #C8E6D4);
+  --gradient-ink: linear-gradient(180deg, #3D3D3D, #1A1A1A);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* 间距体系（4px 基准） */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+
+  /* 兼容旧变量 */
+  --color-primary: var(--celadon-dark);
+  --color-primary-light: var(--celadon-light);
+  --color-accent: var(--silk-gold);
+  --color-bg: var(--paper);
+  --color-bg-card: var(--card-bg);
+  --color-text: var(--ink-dark);
+  --color-text-secondary: var(--ink-light);
+  --color-border: var(--border-color);
+  --color-danger: var(--vermilion);
+  --color-warning: #D4A017;
+  --color-success: #5B8C5A;
+  --tab-height: 72px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ====== 全局重置 ====== */
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  background: #E8E4DE;
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+/* 标题用宋体 */
+h1, h2, h3, h4, .page-title, .home-app-name, .section-title h3, .card-title {
+  font-family: 'Noto Serif SC', 'PingFang SC', 'STSong', serif;
+  letter-spacing: 0.5px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+button {
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+
+/* ====== 页面布局 ====== */
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  padding-bottom: calc(var(--tab-height) + var(--safe-bottom) + var(--space-lg));
+  -webkit-overflow-scrolling: touch;
+}
+
+.page-body::-webkit-scrollbar { display: none; }
+
+/* ====== 页面头部 ====== */
+.page-header {
+  padding: var(--space-md) var(--space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  min-height: 48px;
+}
+.page-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.back-btn {
+  font-size: 14px;
+  background: none;
+  border: none;
+  color: var(--celadon-dark);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+/* ====== 分区标题 ====== */
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-xl) 0 var(--space-md);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-dark);
+  letter-spacing: 0.3px;
+}
+.section-title .more {
+  font-size: 13px;
+  color: var(--ink-light);
+  font-weight: 400;
+}
+
+/* ====== 空状态 ====== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--color-text-secondary);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+.empty-state .text { font-size: 14px; }
+
+/* ====== 主按钮 ====== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  background: var(--gradient-brand);
+  color: #FFF;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-primary:active { opacity: 0.85; transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ====== 卡片通用 ====== */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0,0,0,0.04);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ====== 宣纸纹理背景（纯 CSS） ====== */
+.app-container {
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(139,119,90,0.015) 3px, rgba(139,119,90,0.015) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 5px, rgba(139,119,90,0.01) 5px, rgba(139,119,90,0.01) 6px),
+    linear-gradient(180deg, #FDFAF5 0%, #FBF8F0 30%, #F9F4EB 60%, #FBF7F2 100%);
+}
+
+/* ====== 印章标签 ====== */
+.stamp-tag {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 3px 8px; font-size: 11px; font-weight: 600;
+  font-family: 'Noto Serif SC', serif;
+  border: 1.5px solid currentColor;
+  letter-spacing: 1px;
+  position: relative;
+}
+.stamp-tag.stamp-celadon { color: var(--celadon-dark); border-color: var(--celadon-dark); background: rgba(74,139,122,0.04); }
+.stamp-tag.stamp-vermilion { color: var(--vermilion); border-color: var(--vermilion); background: rgba(192,72,81,0.04); }
+.stamp-tag.stamp-gold { color: var(--silk-gold); border-color: var(--silk-gold); background: rgba(184,149,106,0.04); }
+.stamp-tag.stamp-indigo { color: var(--indigo); border-color: var(--indigo); background: rgba(66,80,102,0.04); }
+
+/* ====== 水墨分隔线 ====== */
+.ink-divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06) 20%, rgba(0,0,0,0.06) 80%, transparent);
+  margin: var(--space-md) 0;
+}
+
+/* ====== 骨架屏 ====== */
+.skeleton {
+  background: linear-gradient(90deg, #EDE9E2 25%, #F5F0E8 50%, #EDE9E2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ====== 标签 ====== */
+.tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+}
+.tag-celadon { background: var(--celadon-pale); color: var(--celadon-dark); }
+.tag-gold { background: #FDF3E0; color: #9A7B3C; }
+.tag-vermilion { background: #FCEAE9; color: var(--vermilion); }
+
+/* ====== 进度条 ====== */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #EDE9E2;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--gradient-brand);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ====== 通用遮罩/弹窗 ====== */
+.overlay {
+  position: absolute; inset: 0; z-index: 999;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-lg);
+}
