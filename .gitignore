@@ -6,3 +6,4 @@ docs/
 .agents/
 skills-lock.json
 .claude/
+public/videos/
