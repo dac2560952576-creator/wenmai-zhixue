@@ -161,7 +161,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { generatePatternImage, generateArticleStream, reviewArticle as aiReview, checkTaboos } from '@/services/ai'
-import { createPost } from '@/services/supabase'
+import { createPost, uploadImageFromUrl } from '@/services/supabase'
 import { getLocalPatternHistory, saveLocalPatternHistory, getLocalArticleHistory, saveLocalArticleHistory, fetchMergedPatternHistory, fetchMergedArticleHistory, initDB } from '@/services/db'
 import { logError } from '@/services/errorLog'
 
@@ -197,12 +197,23 @@ async function generatePatterns() {
   generating.value = true
   patterns.value = []
   try {
-    const urls = await generatePatternImage(topic.value)
-    patterns.value = urls
+    const tempUrls = await generatePatternImage(topic.value)
+    patterns.value = tempUrls
 
-    for (const url of urls) {
-      saveLocalPatternHistory(topic.value, url)
+    // 转存到 Supabase Storage 永久保存（临时链接会过期）
+    const permanentUrls = []
+    for (let i = 0; i < tempUrls.length; i++) {
+      try {
+        const path = `patterns/${authStore.user.id}/${Date.now()}_${i}.png`
+        const permUrl = await uploadImageFromUrl(tempUrls[i], path)
+        permanentUrls.push(permUrl)
+        saveLocalPatternHistory(topic.value, permUrl)
+      } catch {
+        // 上传失败则回退保存临时链接
+        saveLocalPatternHistory(topic.value, tempUrls[i])
+      }
     }
+    if (permanentUrls.length) patterns.value = permanentUrls
     patternHistory.value = getLocalPatternHistory()
   } catch (e) {
     logError('create:generatePatterns', e)

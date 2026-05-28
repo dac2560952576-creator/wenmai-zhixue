@@ -182,6 +182,7 @@ const craftMap = {
 
 // ---- 学习记录 ----
 const learningRecords = computed(() => {
+  if (!authStore.isLoggedIn) return []
   const records = []
 
   const views = getAllCourseViews()

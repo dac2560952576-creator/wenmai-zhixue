@@ -3,7 +3,7 @@
     <header class="page-header">
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <h1 class="page-title">纹样历史</h1>
-      <button v-if="allImages.length" class="back-btn" style="color: var(--vermilion);" @click="clearAll">清空</button>
+      <button v-if="allImages.length || clearing" class="back-btn" style="color: var(--vermilion);" @click="clearAll" :disabled="clearing">{{ clearing ? '清空中...' : '清空' }}</button>
     </header>
 
     <div class="page-body">
@@ -67,14 +67,19 @@ const groupedImages = computed(() => {
   return order.filter(k => groups[k]).map(k => ({ label: k, items: groups[k] }))
 })
 
-function deleteItem(id) {
+const clearing = ref(false)
+
+async function deleteItem(id) {
   allImages.value = allImages.value.filter(item => item.id !== id)
-  removeLocalPatternItem(id)
+  await removeLocalPatternItem(id)
 }
 
-function clearAll() {
-  clearLocalPatternHistory()
+async function clearAll() {
+  if (clearing.value) return
+  clearing.value = true
   allImages.value = []
+  await clearLocalPatternHistory()
+  clearing.value = false
 }
 </script>
 

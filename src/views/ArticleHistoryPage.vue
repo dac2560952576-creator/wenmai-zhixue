@@ -3,7 +3,7 @@
     <header class="page-header">
       <button class="back-btn" @click="$router.back()">← 返回</button>
       <h1 class="page-title">AI文案历史</h1>
-      <button v-if="allArticles.length" class="back-btn" style="color: var(--vermilion);" @click="clearAll">清空</button>
+      <button v-if="allArticles.length || clearing" class="back-btn" style="color: var(--vermilion);" @click="clearAll" :disabled="clearing">{{ clearing ? '清空中...' : '清空' }}</button>
     </header>
 
     <div class="page-body">
@@ -84,14 +84,19 @@ function formatDate(isoStr) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-function deleteItem(id) {
+const clearing = ref(false)
+
+async function deleteItem(id) {
   allArticles.value = allArticles.value.filter(item => item.id !== id)
-  removeLocalArticleItem(id)
+  await removeLocalArticleItem(id)
 }
 
-function clearAll() {
-  clearLocalArticleHistory()
+async function clearAll() {
+  if (clearing.value) return
+  clearing.value = true
   allArticles.value = []
+  await clearLocalArticleHistory()
+  clearing.value = false
 }
 </script>
 

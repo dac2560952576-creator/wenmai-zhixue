@@ -217,6 +217,18 @@ export function addComment(comment) {
 }
 
 // ---- 纹样历史（Supabase） ----
+export async function deletePatternByUrl(userId, imageUrl) {
+  const { error } = await supabase.from('pattern_history')
+    .delete().eq('user_id', userId).eq('image_url', imageUrl)
+  if (error) console.warn('删除纹样记录失败:', error.message)
+}
+
+export async function deleteArticleByContent(userId, content) {
+  const { error } = await supabase.from('article_history')
+    .delete().eq('user_id', userId).eq('content', content)
+  if (error) console.warn('删除文案记录失败:', error.message)
+}
+
 export async function savePatternRecord(userId, topic, imageUrl) {
   const { error } = await supabase.from('pattern_history').insert({
     user_id: userId,
@@ -244,6 +256,12 @@ export async function fetchPatternRecords(userId) {
 }
 
 // ---- 文案历史（Supabase） ----
+export async function deleteArticleRecord(recordId) {
+  const { error } = await supabase.from('article_history').delete().eq('id', recordId)
+  if (error) console.warn('删除文案记录失败:', error.message)
+  return error
+}
+
 export async function saveArticleRecord(userId, topic, content, reviews) {
   const { error } = await supabase.from('article_history').insert({
     user_id: userId,
@@ -282,6 +300,19 @@ export function syncProgress(userId, progressList) {
 
 export function fetchProgress(userId) {
   return supabase.from('progress').select('*').eq('user_id', userId)
+}
+
+// ---- 存储上传 ----
+export async function uploadImageFromUrl(imageUrl, filePath) {
+  const res = await fetch(imageUrl)
+  if (!res.ok) throw new Error('下载图片失败')
+  const blob = await res.blob()
+  const { error } = await supabase.storage.from('images').upload(filePath, blob, {
+    upsert: true,
+    contentType: blob.type || 'image/png'
+  })
+  if (error) throw error
+  return supabase.storage.from('images').getPublicUrl(filePath).data.publicUrl
 }
 
 // ---- Realtime 订阅 ----
