@@ -8,8 +8,8 @@
       </header>
       <!-- 大图 -->
       <div class="detail-img-wrap">
-        <img :src="post.image_url" v-if="post.image_url" />
-        <div class="detail-img-placeholder" v-else>🏺</div>
+        <img :src="post.image_url" v-if="post.image_url" @error="e => e.target.style.display='none'" />
+        <div class="detail-img-placeholder" v-if="!post.image_url">🏺</div>
       </div>
 
       <!-- 标题和作者 -->
@@ -78,6 +78,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { fetchPostDetail, fetchComments, addComment as addCommentApi, toggleLike, removeLike, fetchUserLikes, subscribeToPostLikes, subscribeToPostComments, unsubscribe, batchFetchProfiles } from '@/services/supabase'
+import gsap from 'gsap'
 
 const route = useRoute()
 const router = useRouter()
@@ -140,6 +141,9 @@ async function handleLike() {
   } else {
     await toggleLike(authStore.user.id, post.value.id)
     liked.value = true
+    // 点赞弹跳动画
+    const btns = document.querySelectorAll('.action-btn')
+    if (btns[0]) gsap.fromTo(btns[0], { scale: 1 }, { scale: 1.3, duration: 0.15, yoyo: true, repeat: 1, ease: 'power2.out' })
   }
 }
 

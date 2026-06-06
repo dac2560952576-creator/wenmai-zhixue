@@ -7,7 +7,7 @@
     </header>
 
     <div class="page-body auth-body">
-      <div class="auth-logo">🏺🧵</div>
+      <img src="/logo.png" alt="文脉智学" class="auth-logo-img" />
       <h2 class="auth-app-name">文脉智学</h2>
       <p class="auth-desc">{{ pageDesc }}</p>
 
@@ -146,7 +146,7 @@ async function handleAuth() {
   display: flex; flex-direction: column; align-items: center;
   padding: 40px 24px;
 }
-.auth-logo { font-size: 48px; }
+.auth-logo-img { width: 72px; height: 72px; object-fit: contain; margin-bottom: 8px; }
 .auth-app-name { font-size: 24px; font-weight: 700; margin-top: 8px; color: var(--celadon-dark); }
 .auth-desc { font-size: 13px; color: var(--ink-light); margin-top: 4px; margin-bottom: 32px; text-align: center; }
 

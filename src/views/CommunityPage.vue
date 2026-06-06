@@ -18,8 +18,8 @@
         <div class="col">
           <div v-for="post in leftCol" :key="post.id" class="post-card" @click="$router.push(`/post/${post.id}`)">
             <div class="post-img-wrap">
-              <img :src="post.image_url" v-if="post.image_url" />
-              <div class="post-img-placeholder" v-else>🏺</div>
+              <img :src="post.image_url" v-if="post.image_url" @error="e => e.target.style.display = 'none'" />
+              <div class="post-img-placeholder" v-if="!post.image_url">🏺</div>
             </div>
             <div class="post-info">
               <h5>{{ post.title }}</h5>
@@ -35,8 +35,8 @@
         <div class="col">
           <div v-for="post in rightCol" :key="post.id" class="post-card" @click="$router.push(`/post/${post.id}`)">
             <div class="post-img-wrap">
-              <img :src="post.image_url" v-if="post.image_url" />
-              <div class="post-img-placeholder" v-else>🎨</div>
+              <img :src="post.image_url" v-if="post.image_url" @error="e => e.target.style.display = 'none'" />
+              <div class="post-img-placeholder" v-if="!post.image_url">🎨</div>
             </div>
             <div class="post-info">
               <h5>{{ post.title }}</h5>
@@ -79,11 +79,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { fetchPosts, subscribeToPosts, unsubscribe, batchFetchProfiles, fetchCommentCounts } from '@/services/supabase'
 import { logError } from '@/services/errorLog'
+import gsap from 'gsap'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -139,6 +140,13 @@ async function loadPosts() {
     logError('community:loadPosts', e)
   } finally {
     loading.value = false
+    // 瀑布流卡片入场动画
+    await nextTick()
+    gsap.from('.post-card', {
+      opacity: 0, y: 24, duration: 0.5,
+      stagger: { each: 0.06, from: 'start' },
+      ease: 'power2.out'
+    })
   }
 }
 

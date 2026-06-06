@@ -100,6 +100,12 @@ const routes = [
     name: 'Chat',
     component: () => import('@/views/ChatPage.vue'),
     meta: { title: '聊天' }
+  },
+  {
+    path: '/era/:name',
+    name: 'EraDetail',
+    component: () => import('@/views/EraDetailPage.vue'),
+    meta: { title: '文脉时代' }
   }
 ]
 

@@ -87,8 +87,9 @@ function formatDate(isoStr) {
 const clearing = ref(false)
 
 async function deleteItem(id) {
+  const itemToDelete = allArticles.value.find(item => item.id === id)
   allArticles.value = allArticles.value.filter(item => item.id !== id)
-  await removeLocalArticleItem(id)
+  if (itemToDelete) await removeLocalArticleItem(itemToDelete)
 }
 
 async function clearAll() {

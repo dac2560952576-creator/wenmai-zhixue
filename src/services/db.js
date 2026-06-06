@@ -270,23 +270,6 @@ export function getReadDocs() {
   try { return JSON.parse(localStorage.getItem(_k('read_docs')) || '{}') } catch { return {} }
 }
 
-// ---- 视频播放位置（localStorage，按用户隔离） ----
-export function saveVideoPosition(courseId, position) {
-  if (!_uid) return
-  try {
-    const data = JSON.parse(localStorage.getItem(_k('video_positions')) || '{}')
-    data[courseId] = { position, updatedAt: new Date().toISOString() }
-    localStorage.setItem(_k('video_positions'), JSON.stringify(data))
-  } catch { /* ignore */ }
-}
-
-export function getVideoPosition(courseId) {
-  try {
-    const data = JSON.parse(localStorage.getItem(_k('video_positions')) || '{}')
-    return data[courseId]?.position || 0
-  } catch { return 0 }
-}
-
 // ---- 学习天数（localStorage，按用户隔离） ----
 export function trackActiveDay() {
   if (!_uid) return 0
@@ -423,23 +406,33 @@ export async function fetchMergedPatternHistory() {
   } catch { return local }
 }
 
-export async function removeLocalPatternItem(id) {
+export async function removeLocalPatternItem(item) {
+  // item 包含完整字段：id, topic, image_url, created_at
+  // 优先标记 deletedSet（无论本地还是远程记录）
+  const delKey = item.topic + item.image_url
+  _addToDeletedSet('pattern_deleted', delKey)
+  console.log('[db] 标记纹样已删除:', delKey.slice(0, 60))
+
+  // 从本地列表移除
   const list = getLocalPatternHistory()
-  const item = list.find(i => i.id === id)
-  if (item) {
-    const delKey = item.topic + item.image_url
-    _addToDeletedSet('pattern_deleted', delKey)
-    console.log('[db] 标记纹样已删除:', delKey.slice(0, 60))
-  }
-  if (item && _uid) {
+  const remaining = list.filter(i => i.id !== item.id)
+  localStorage.setItem(_k('pattern_history'), JSON.stringify(remaining))
+
+  // 删除 Supabase 记录
+  if (_uid) {
     try {
       const m = await import('@/services/supabase.js')
-      await m.deletePatternByUrl(_uid, item.image_url)
-      console.log('[db] Supabase 纹样删除成功')
+      // 优先用主键 ID 删除（适用于远程记录），否则按 URL 匹配删除（适用于本地记录）
+      const isRemoteId = typeof item.id === 'number' && item.id < 1000000
+      if (isRemoteId) {
+        await m.deletePatternById(item.id)
+        console.log('[db] Supabase 纹样按ID删除成功, id:', item.id)
+      } else {
+        await m.deletePatternByUrl(_uid, item.image_url)
+        console.log('[db] Supabase 纹样按URL删除成功')
+      }
     } catch (e) { console.warn('[db] Supabase 纹样删除失败（已通过本地标记兜底）:', e.message) }
   }
-  const remaining = list.filter(i => i.id !== id)
-  localStorage.setItem(_k('pattern_history'), JSON.stringify(remaining))
   return remaining
 }
 
@@ -453,7 +446,11 @@ export async function clearLocalPatternHistory() {
       for (const r of remote) _addToDeletedSet('pattern_deleted', r.topic + r.image_url)
       console.log('[db] 远程', remote.length, '条纹样也标记删除')
       const m = await import('@/services/supabase.js')
-      for (const r of remote) await m.deletePatternByUrl(_uid, r.image_url).catch(() => {})
+      for (const r of remote) {
+        await m.deletePatternById(r.id).catch(() =>
+          m.deletePatternByUrl(_uid, r.image_url).catch(() => {})
+        )
+      }
     } catch { /* ignore */ }
   }
   console.log('[db] 全部纹样已清除: local', list.length, '条')
@@ -497,18 +494,32 @@ export async function fetchMergedArticleHistory() {
   } catch { return local }
 }
 
-export async function removeLocalArticleItem(id) {
+export async function removeLocalArticleItem(item) {
+  // item 包含完整字段：id, topic, content, reviews, created_at
+  // 优先标记 deletedSet（无论本地还是远程记录）
+  const delKey = item.topic + (item.content?.slice(0, 50) || '')
+  _addToDeletedSet('article_deleted', delKey)
+
+  // 从本地列表移除
   const list = getLocalArticleHistory()
-  const item = list.find(i => i.id === id)
-  if (item) _addToDeletedSet('article_deleted', item.topic + item.content?.slice(0, 50))
-  if (item && _uid) {
+  const remaining = list.filter(i => i.id !== item.id)
+  localStorage.setItem(_k('article_history'), JSON.stringify(remaining))
+
+  // 删除 Supabase 记录
+  if (_uid) {
     try {
       const m = await import('@/services/supabase.js')
-      await m.deleteArticleByContent(_uid, item.content)
+      // 优先用主键 ID 删除（适用于远程记录），否则按内容匹配删除（适用于本地记录）
+      const isRemoteId = typeof item.id === 'number' && item.id < 1000000
+      if (isRemoteId) {
+        await m.deleteArticleById(item.id)
+        console.log('[db] Supabase 文案按ID删除成功, id:', item.id)
+      } else {
+        await m.deleteArticleByContent(_uid, item.content)
+        console.log('[db] Supabase 文案按内容删除成功')
+      }
     } catch { /* deletedSet 已兜底 */ }
   }
-  const remaining = list.filter(i => i.id !== id)
-  localStorage.setItem(_k('article_history'), JSON.stringify(remaining))
   return remaining
 }
 
@@ -521,7 +532,11 @@ export async function clearLocalArticleHistory() {
       const remote = await fetchArticleRecords(_uid)
       for (const r of remote) _addToDeletedSet('article_deleted', r.topic + r.content?.slice(0, 50))
       const m = await import('@/services/supabase.js')
-      for (const r of remote) await m.deleteArticleByContent(_uid, r.content).catch(() => {})
+      for (const r of remote) {
+        await m.deleteArticleById(r.id).catch(() =>
+          m.deleteArticleByContent(_uid, r.content).catch(() => {})
+        )
+      }
     } catch { /* ignore */ }
   }
   console.log('[db] 全部文案已清除: local', list.length, '条')

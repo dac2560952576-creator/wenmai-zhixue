@@ -114,10 +114,20 @@
 
         <div class="ai-chat-box">
           <div class="chat-messages" ref="chatRef">
+            <div v-if="chatMessages.length <= 1" class="chat-guide">
+              <p class="chat-guide-title">💡 试试这些问题：</p>
+              <div class="chat-guide-chips">
+                <span v-for="q in presetQuestions" :key="q" class="chat-guide-chip" @click="chatInput = q; sendQuestion()">{{ q }}</span>
+              </div>
+            </div>
             <div v-for="(msg, i) in chatMessages" :key="i" :class="['msg', msg.role]">
               {{ msg.content }}
             </div>
             <div v-if="chatLoading" class="msg assistant skeleton-text">思考中...</div>
+            <div v-if="followUpQuestions.length && !chatLoading" class="chat-followup">
+              <p class="chat-followup-title">💬 你可能还想问：</p>
+              <span v-for="q in followUpQuestions" :key="q" class="chat-guide-chip followup" @click="chatInput = q; sendQuestion()">{{ q }}</span>
+            </div>
           </div>
           <div class="chat-input-row">
             <input
@@ -142,6 +152,7 @@ import { useAppStore } from '@/stores/app'
 import { askQuestionStream } from '@/services/ai'
 import { getLocalQuizStats, saveLocalQuizResult, getLocalWrongQuestions, saveLocalWrongQuestion, clearLocalWrongQuestions, initDB, saveQuizResult, saveWrongQuestion, getWrongQuestions, getQuizStats, getChatHistory, saveChatHistory, deleteChatHistory, clearChatHistory, trackActiveDay } from '@/services/db'
 import quizData from '@/data/题库.json'
+import gsap from 'gsap'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -171,6 +182,17 @@ async function selectAnswer(i) {
   answered.value = true
   const correct = i === currentQuestion.value.answer
 
+  // GSAP 答题反馈动画
+  await nextTick()
+  const card = document.querySelector('.quiz-card')
+  if (card) {
+    if (correct) {
+      gsap.fromTo(card, { scale: 1 }, { scale: 1.02, duration: 0.15, yoyo: true, repeat: 1, ease: 'power2.out' })
+    } else {
+      gsap.fromTo(card, { x: 0 }, { x: 3, duration: 0.06, repeat: 3, yoyo: true, ease: 'power2.inOut', onComplete: () => gsap.set(card, { x: 0 }) })
+    }
+  }
+
   // 1. 先写 localStorage（同步可靠，立即生效）
   stats.value = saveLocalQuizResult(correct)
   if (!correct) {
@@ -193,6 +215,10 @@ function nextQuestion() {
   qIndex.value++
   selected.value = -1
   answered.value = false
+  nextTick(() => {
+    const card = document.querySelector('.quiz-card')
+    if (card) gsap.from(card, { opacity: 0, x: 20, duration: 0.3, ease: 'power2.out' })
+  })
 }
 
 function restartQuiz() {
@@ -228,6 +254,29 @@ const WELCOME_MSG = { role: 'assistant', content: '你好！我是中国传统�
 const chatMessages = ref([{ ...WELCOME_MSG }])
 const chatInput = ref('')
 const chatLoading = ref(false)
+const presetQuestions = [
+  '龙泉青瓷的粉青和梅子青有什么区别？',
+  '苏绣双面绣为什么正反两面都能做到精美？',
+  '景泰蓝是怎么制作的？为什么叫"景泰蓝"？',
+  '紫砂壶为什么适合泡茶？'
+]
+const followUpQuestions = ref([])
+function setFollowUp(lastAssistantMsg) {
+  const content = lastAssistantMsg?.content || ''
+  if (content.includes('龙泉') || content.includes('青瓷')) {
+    followUpQuestions.value = ['哥窑和弟窑有什么区别？', '龙泉青瓷是怎样出口到国外的？']
+  } else if (content.includes('苏绣') || content.includes('刺绣')) {
+    followUpQuestions.value = ['乱针绣和传统平绣有什么不同？', '学苏绣需要从什么针法入门？']
+  } else if (content.includes('景泰蓝') || content.includes('珐琅')) {
+    followUpQuestions.value = ['景泰蓝的"点蓝"和"烧蓝"是什么意思？', '掐丝珐琅和画珐琅有什么不同？']
+  } else if (content.includes('紫砂') || content.includes('壶')) {
+    followUpQuestions.value = ['紫砂壶的泥料有哪些种类？', '如何辨别手工壶和模具壶？']
+  } else if (content.includes('丝绸') || content.includes('织')) {
+    followUpQuestions.value = ['绫罗绸缎有什么区别？', '缂丝为什么那么珍贵？']
+  } else {
+    followUpQuestions.value = ['还有其他类似的手工艺吗？', '这门工艺现在还有人传承吗？']
+  }
+}
 const chatRef = ref(null)
 
 // 历史对话
@@ -245,6 +294,7 @@ const activeChatTitle = computed(() => {
 function newChat() {
   activeChatId.value = Date.now()
   chatMessages.value = [{ ...WELCOME_MSG }]
+  followUpQuestions.value = []
   showHistory.value = false
 }
 
@@ -327,6 +377,16 @@ async function sendQuestion() {
   chatLoading.value = true
   chatMessages.value.push({ role: 'assistant', content: '' })
 
+  // GSAP 气泡动画
+  await nextTick()
+  const bubbles = chatRef.value?.querySelectorAll('.msg')
+  if (bubbles?.length) {
+    const last = bubbles[bubbles.length - 1]
+    const prev = bubbles[bubbles.length - 2]
+    if (prev) gsap.from(prev, { opacity: 0, x: 16, duration: 0.25, ease: 'power2.out' })
+    if (last) gsap.from(last, { opacity: 0, x: -16, duration: 0.25, ease: 'power2.out', delay: 0.1 })
+  }
+
   const scroll = () => {
     if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight
   }
@@ -342,8 +402,9 @@ async function sendQuestion() {
     if (!lastMsg.content) {
       lastMsg.content = '抱歉，暂时无法回答这个问题。'
     }
-    // 回答完成，保存到历史
+    // 回答完成，保存到历史 + 推荐追问
     saveCurrentChat()
+    setFollowUp(lastMsg)
   } catch (e) {
     chatMessages.value.pop()
     chatMessages.value.push({ role: 'assistant', content: `AI服务调用失败：${e.message}` })
@@ -353,6 +414,10 @@ async function sendQuestion() {
 }
 
 onMounted(async () => {
+  // 引导问题入场动画
+  nextTick(() => {
+    gsap.from('.chat-guide-chip', { opacity: 0, x: -12, duration: 0.3, stagger: 0.06, ease: 'power2.out', delay: 0.2 })
+  })
   if (authStore.isLoggedIn) trackActiveDay()
   try {
     await initDB()
@@ -563,4 +628,33 @@ onMounted(async () => {
 }
 .chat-send:active { opacity: 0.8; }
 .chat-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 引导问题 */
+.chat-guide {
+  padding: 0 0 12px;
+}
+.chat-guide-title {
+  font-size: 12px; color: var(--ink-light); margin-bottom: 8px;
+}
+.chat-guide-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.chat-guide-chip {
+  font-size: 12px; padding: 6px 12px;
+  border-radius: var(--radius-full); cursor: pointer;
+  background: var(--card-bg); border: 1px solid var(--border-color);
+  color: var(--ink-mid); transition: all 0.15s; white-space: nowrap;
+}
+.chat-guide-chip:active { background: var(--celadon-pale); border-color: var(--celadon); }
+
+/* 追问 */
+.chat-followup {
+  padding: 10px 0 4px;
+}
+.chat-followup-title {
+  font-size: 11px; color: var(--ink-light); margin-bottom: 6px;
+}
+.chat-guide-chip.followup {
+  font-size: 11px; padding: 5px 10px;
+}
 </style>

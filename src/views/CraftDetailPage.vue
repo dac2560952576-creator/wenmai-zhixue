@@ -26,7 +26,10 @@
         <p>{{ craft.brief }}</p>
         <div class="detail-note">💡 进阶知识文档正在扩充中</div>
       </div>
+
     </div>
+
+    <DocsAIAssistant v-if="craft" :craft-name="craft.name" :doc-content="fullDocContent" />
 
     <!-- 未找到 -->
     <div v-if="!craft" class="empty-state">
@@ -37,11 +40,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { getCachedKnowledgeDocs } from '@/services/ai'
+import gsap from 'gsap'
 import { markDocRead } from '@/services/db'
 import craftsData from '@/data/工艺知识库.json'
+import DocsAIAssistant from '@/components/DocsAIAssistant.vue'
 
 const route = useRoute()
 
@@ -182,10 +187,22 @@ loadDocContent(route.params.id)
 // ---- 路由切换时重新加载 ----
 watch(() => route.params.id, (newId) => {
   loadDocContent(newId)
+  animateDocContent()
 })
+
+// ---- 文档内容逐段浮现 ----
+async function animateDocContent() {
+  await nextTick()
+  const els = document.querySelectorAll('.doc-content h1, .doc-content h2, .doc-content h3, .doc-content p, .doc-content ul, .doc-content table')
+  if (els.length) {
+    gsap.from(els, { opacity: 0, y: 16, duration: 0.45, stagger: 0.04, ease: 'power2.out' })
+  }
+}
+onMounted(() => { animateDocContent() })
 </script>
 
 <style scoped>
+.page { position: relative; }
 .craft-meta {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; color: var(--ink-light); margin-bottom: var(--space-md);
@@ -200,31 +217,80 @@ watch(() => route.params.id, (newId) => {
   border: 1px solid rgba(0,0,0,0.04);
 }
 
-.doc-content { margin-top: var(--space-sm); }
-.doc-content h1 { font-size: 20px; margin: 18px 0 10px; color: var(--ink-dark); }
-.doc-content h2 {
-  font-size: 16px; color: var(--celadon-dark); margin: 16px 0 8px;
-  padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
+.doc-content { margin-top: var(--space-lg); }
+
+/* ====== 标题层级 ====== */
+.doc-content h1 {
+  font-size: 22px; font-weight: 700; margin: 32px 0 16px; color: var(--ink-dark);
+  font-family: 'Noto Serif SC', serif; letter-spacing: 0.8px;
+  text-align: center; padding-bottom: 12px;
+  position: relative;
 }
-.doc-content h3 { font-size: 14px; margin: 12px 0 6px; color: var(--silk-gold); }
-.doc-content p { line-height: 1.8; font-size: 14px; margin-bottom: 8px; color: var(--ink-dark); }
-.doc-content ul { margin: 8px 0; padding-left: 18px; }
-.doc-content li { line-height: 1.7; font-size: 13px; color: var(--ink-mid); margin-bottom: 4px; }
-.doc-content strong { color: var(--celadon-dark); }
+.doc-content h1::after {
+  content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 48px; height: 2px; background: var(--celadon); border-radius: 1px;
+}
+
+.doc-content h2 {
+  font-size: 17px; font-weight: 700; color: var(--celadon-dark); margin: 28px 0 12px;
+  font-family: 'Noto Serif SC', serif; letter-spacing: 0.5px;
+  display: flex; align-items: center; gap: 10px;
+}
+.doc-content h2::before {
+  content: ''; display: inline-block; width: 4px; height: 18px;
+  background: var(--celadon); border-radius: 2px; flex-shrink: 0;
+}
+
+.doc-content h3 {
+  font-size: 15px; font-weight: 600; margin: 22px 0 10px; color: var(--silk-gold);
+  font-family: 'Noto Serif SC', serif;
+}
+
+/* ====== 正文段落 ====== */
+.doc-content p {
+  line-height: 1.85; font-size: 14px; margin-bottom: 14px; color: var(--ink-mid);
+}
+.doc-content p:first-of-type {
+  font-size: 15px; color: var(--ink-dark);
+}
+
+/* ====== 列表 ====== */
+.doc-content ul, .doc-content ol {
+  margin: 10px 0 16px; padding: 0; list-style: none;
+}
+.doc-content li {
+  line-height: 1.8; font-size: 14px; color: var(--ink-mid); margin-bottom: 6px;
+  padding: 6px 0 6px 24px; position: relative;
+}
+.doc-content li::before {
+  content: ''; position: absolute; left: 8px; top: 15px;
+  width: 5px; height: 5px; background: var(--celadon); border-radius: 50%;
+}
+
+/* ====== 行内标记 ====== */
+.doc-content strong { color: var(--celadon-dark); font-weight: 600; }
+.doc-content em { color: var(--silk-gold); font-style: normal; }
+
+/* ====== 表格 ====== */
 .doc-content table {
-  width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px;
+  width: 100%; border-collapse: collapse; margin: 16px 0 20px; font-size: 13px;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 .doc-content th {
-  background: var(--celadon-pale); padding: 8px 10px; text-align: left; font-weight: 600;
-  border-bottom: 2px solid var(--celadon); white-space: nowrap;
+  background: var(--celadon-dark); color: #FFF; padding: 10px 12px;
+  text-align: left; font-weight: 600; font-size: 12px; letter-spacing: 0.5px;
 }
 .doc-content td {
-  padding: 8px 10px; border-bottom: 1px solid var(--border-color); line-height: 1.6;
-  vertical-align: top;
+  padding: 10px 12px; line-height: 1.7; vertical-align: top;
+  background: var(--card-bg); border-top: 1px solid var(--border-color);
 }
-.doc-content tr:last-child td { border-bottom: none; }
+.doc-content tr:nth-child(even) td { background: #FAFAF7; }
+
+/* ====== 分隔线 ====== */
 .doc-content hr {
-  border: none; height: 1px; background: var(--border-color); margin: 20px 0;
+  border: none; height: 1px; margin: 28px 0;
+  background: linear-gradient(90deg, transparent, var(--border-color) 20%, var(--border-color) 80%, transparent);
 }
 
 .empty-state {

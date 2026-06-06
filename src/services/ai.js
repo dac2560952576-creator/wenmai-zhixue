@@ -180,12 +180,13 @@ async function loadAllCraftsKnowledge() {
 }
 
 // ---- 流式 AI 问答 ----
-export async function askQuestionStream(question, onToken) {
+export async function askQuestionStream(question, onToken, customContext) {
+  // customContext: 可选，传入特定文档内容代替全量知识库
   if (!API_KEY || API_KEY === 'your-dashscope-api-key-here') {
     throw new Error('API Key 未配置，请在 .env 文件中设置 VITE_DASHSCOPE_API_KEY')
   }
 
-  const knowledge = await loadAllCraftsKnowledge()
+  const knowledge = customContext || await loadAllCraftsKnowledge()
 
   const res = await fetch(QWEN_API_URL, {
     method: 'POST',

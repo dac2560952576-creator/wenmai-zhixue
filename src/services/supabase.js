@@ -221,12 +221,30 @@ export async function deletePatternByUrl(userId, imageUrl) {
   const { error } = await supabase.from('pattern_history')
     .delete().eq('user_id', userId).eq('image_url', imageUrl)
   if (error) console.warn('删除纹样记录失败:', error.message)
+  return error
+}
+
+/** 按 Supabase 主键 ID 删除纹样记录（可靠方式） */
+export async function deletePatternById(recordId) {
+  const { error } = await supabase.from('pattern_history')
+    .delete().eq('id', recordId)
+  if (error) console.warn('按ID删除纹样失败:', error.message)
+  return error
 }
 
 export async function deleteArticleByContent(userId, content) {
   const { error } = await supabase.from('article_history')
     .delete().eq('user_id', userId).eq('content', content)
   if (error) console.warn('删除文案记录失败:', error.message)
+  return error
+}
+
+/** 按 Supabase 主键 ID 删除文案记录（可靠方式） */
+export async function deleteArticleById(recordId) {
+  const { error } = await supabase.from('article_history')
+    .delete().eq('id', recordId)
+  if (error) console.warn('按ID删除文案失败:', error.message)
+  return error
 }
 
 export async function savePatternRecord(userId, topic, imageUrl) {
@@ -303,16 +321,70 @@ export function fetchProgress(userId) {
 }
 
 // ---- 存储上传 ----
+
+/**
+ * 从远程URL下载图片并上传到 Supabase Storage
+ * 优先使用 <img>+Canvas 方式（绕过CORS），失败时回退到 fetch
+ */
+async function downloadImageAsBlob(imageUrl) {
+  // 方法1：<img> + Canvas（绕过CORS限制，<img>标签可加载任意来源图片）
+  try {
+    const blob = await new Promise((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      const timer = setTimeout(() => reject(new Error('图片加载超时(15s)')), 15000)
+
+      img.onload = () => {
+        clearTimeout(timer)
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0)
+          canvas.toBlob(blob => {
+            if (blob) resolve(blob)
+            else reject(new Error('Canvas导出失败'))
+          }, 'image/png')
+        } catch (e) {
+          reject(e)
+        }
+      }
+
+      img.onerror = () => {
+        clearTimeout(timer)
+        reject(new Error('图片元素加载失败'))
+      }
+
+      img.src = imageUrl
+    })
+    return blob
+  } catch (canvasErr) {
+    console.warn('[upload] Canvas方式下载失败，尝试fetch:', canvasErr.message)
+    // 方法2：fetch 回退（适用于允许CORS的URL）
+    const res = await fetch(imageUrl)
+    if (!res.ok) throw new Error(`下载图片失败 (HTTP ${res.status})`)
+    return await res.blob()
+  }
+}
+
 export async function uploadImageFromUrl(imageUrl, filePath) {
-  const res = await fetch(imageUrl)
-  if (!res.ok) throw new Error('下载图片失败')
-  const blob = await res.blob()
+  console.log('[upload] 开始转存图片:', imageUrl.slice(0, 80) + '...')
+  const blob = await downloadImageAsBlob(imageUrl)
+  console.log('[upload] 图片下载完成, size:', (blob.size / 1024).toFixed(1), 'KB')
+
   const { error } = await supabase.storage.from('images').upload(filePath, blob, {
     upsert: true,
     contentType: blob.type || 'image/png'
   })
-  if (error) throw error
-  return supabase.storage.from('images').getPublicUrl(filePath).data.publicUrl
+  if (error) {
+    console.error('[upload] Supabase Storage上传失败:', error.message)
+    throw error
+  }
+
+  const publicUrl = supabase.storage.from('images').getPublicUrl(filePath).data.publicUrl
+  console.log('[upload] 转存成功:', publicUrl.slice(0, 80) + '...')
+  return publicUrl
 }
 
 // ---- Realtime 订阅 ----

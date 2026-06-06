@@ -78,7 +78,7 @@
         <div v-if="myPosts.length" class="post-grid">
           <div v-for="post in myPosts" :key="post.id" class="post-item" @click="$router.push(`/post/${post.id}`)">
             <div class="post-thumb">
-              <img :src="post.image_url" v-if="post.image_url" />
+              <img :src="post.image_url" v-if="post.image_url" @error="e => e.target.style.display='none'" />
               <div class="post-thumb-placeholder" v-else>🏺</div>
               <div class="post-thumb-actions" @click.stop>
                 <button class="post-action-btn edit" @click="editPost(post.id)">✏️</button>
@@ -101,7 +101,7 @@
         <div v-if="likedPosts.length" class="post-grid">
           <div v-for="post in likedPosts" :key="post.id" class="post-item" @click="$router.push(`/post/${post.id}`)">
             <div class="post-thumb">
-              <img :src="post.image_url" v-if="post.image_url" />
+              <img :src="post.image_url" v-if="post.image_url" @error="e => e.target.style.display='none'" />
               <div class="post-thumb-placeholder" v-else>🏺</div>
             </div>
             <div class="post-item-title">{{ post.title }}</div>

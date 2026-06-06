@@ -2,7 +2,13 @@
   <div class="app-shell">
     <div class="app-container">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
+        <transition
+          mode="out-in"
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @before-leave="onBeforeLeave"
+          @leave="onLeave"
+        >
           <component :is="Component" />
         </transition>
       </router-view>
@@ -18,6 +24,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { subscribeToMessages, unsubscribe } from '@/services/supabase'
+import gsap from 'gsap'
 import { addUnreadPartner } from '@/services/db'
 import TabBar from '@/components/TabBar.vue'
 
@@ -44,6 +51,12 @@ function stopMessageListener() {
     globalMsgChannel = null
   }
 }
+
+// ---- 页面切换 GSAP 动画 ----
+function onBeforeEnter(el) { gsap.set(el, { opacity: 0, x: 12 }) }
+function onEnter(el, done) { gsap.to(el, { opacity: 1, x: 0, duration: 0.28, ease: 'power2.out', onComplete: done }) }
+function onBeforeLeave(el) { gsap.set(el, { opacity: 1 }) }
+function onLeave(el, done) { gsap.to(el, { opacity: 0, duration: 0.15, ease: 'power2.in', onComplete: done }) }
 
 watch(() => authStore.isLoggedIn, (loggedIn) => {
   if (loggedIn) startMessageListener()
@@ -100,10 +113,4 @@ onUnmounted(() => {
   }
 }
 
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
 </style>

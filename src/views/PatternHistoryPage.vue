@@ -11,7 +11,7 @@
         <div class="date-label">{{ group.label }}</div>
         <div class="image-grid">
           <div v-for="item in group.items" :key="item.id" class="image-item" @click="previewItem = item">
-            <img :src="item.image_url" :alt="item.topic" />
+            <img :src="item.image_url" :alt="item.topic" @error="e => e.target.style.display='none'" />
             <div class="image-topic">{{ item.topic }}</div>
             <button class="image-del" @click.stop="deleteItem(item.id)">✕</button>
           </div>
@@ -27,7 +27,7 @@
     <!-- 放大预览 -->
     <div class="preview-overlay" v-if="previewItem" @click="previewItem = null">
       <button class="preview-close" @click="previewItem = null">✕</button>
-      <img :src="previewItem.image_url" :alt="previewItem.topic" class="preview-img" @click.stop />
+      <img :src="previewItem.image_url" :alt="previewItem.topic" class="preview-img" @click.stop @error="e => e.target.style.display='none'" />
       <div class="preview-info">{{ previewItem.topic }}</div>
     </div>
   </div>
@@ -70,8 +70,9 @@ const groupedImages = computed(() => {
 const clearing = ref(false)
 
 async function deleteItem(id) {
+  const itemToDelete = allImages.value.find(item => item.id === id)
   allImages.value = allImages.value.filter(item => item.id !== id)
-  await removeLocalPatternItem(id)
+  if (itemToDelete) await removeLocalPatternItem(itemToDelete)
 }
 
 async function clearAll() {

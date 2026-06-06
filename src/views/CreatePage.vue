@@ -33,11 +33,24 @@
       </div>
       <div class="pattern-card">
         <div class="pattern-input-row">
-          <input v-model="topic" placeholder="比如：青瓷莲瓣纹 粉青釉色" @keyup.enter="generatePatterns" />
+          <input v-model="topic" placeholder="输入描述或点击下方标签组合" @keyup.enter="generatePatterns" />
           <button class="gen-btn" @click="generatePatterns" :disabled="!topic || generating">
             {{ generating ? '生成中' : '生成' }}
           </button>
         </div>
+        <div class="guide-tags">
+          <div class="guide-label">📌 纹样</div>
+          <span v-for="t in patternTags" :key="t" class="guide-tag tag-pattern" @click="appendTopic(t)">{{ t }}</span>
+        </div>
+        <div class="guide-tags">
+          <div class="guide-label">🎨 风格</div>
+          <span v-for="t in styleTags" :key="t" class="guide-tag tag-style" @click="appendTopic(t)">{{ t }}</span>
+        </div>
+        <div class="guide-tags">
+          <div class="guide-label">🏺 工艺</div>
+          <span v-for="t in craftTags" :key="t" class="guide-tag tag-craft" @click="appendTopic(t)">{{ t }}</span>
+        </div>
+        <button class="random-inspire-btn" @click="randomInspire">🎲 随机给我一个灵感</button>
         <div v-if="patterns.length" class="pattern-results">
           <div
             v-for="(url, i) in patterns"
@@ -45,7 +58,7 @@
             class="pattern-item"
             @click="previewPatternUrl = url"
           >
-            <img :src="url" :alt="'纹样 ' + (i + 1)" />
+            <img :src="url" :alt="'纹样 ' + (i + 1)" @error="e => e.target.style.display='none'" />
           </div>
         </div>
         <div v-if="generating" class="skeleton-grid">
@@ -63,7 +76,7 @@
       </div>
       <div v-if="patternHistory.length" class="history-grid">
         <div v-for="item in recentPatterns" :key="item.id" class="history-item">
-          <img :src="item.image_url" :alt="item.topic" />
+          <img :src="item.image_url" :alt="item.topic" @error="e => e.target.style.display='none'" />
           <div class="history-topic">{{ item.topic }}</div>
         </div>
       </div>
@@ -75,14 +88,20 @@
       </div>
       <div class="writer-card">
         <div class="writer-input-row">
-          <input v-model="articleTopic" placeholder="比如：龙泉青瓷的历史传承" @keyup.enter="generateArticle" />
-        </div>
-        <div class="writer-actions-top">
-          <span class="craft-tag">AI 生成</span>
+          <input v-model="articleTopic" placeholder="输入主题，或点击下方标签自动填入…" @keyup.enter="generateArticle" />
           <button class="gen-text-btn" @click="generateArticle" :disabled="!articleTopic || articleLoading">
             {{ articleLoading ? '生成中...' : '生成文案' }}
           </button>
         </div>
+        <div class="guide-tags">
+          <div class="guide-label">📖 工艺</div>
+          <span v-for="t in writerCraftTags" :key="t" class="guide-tag tag-craft" :class="{ active: articleCraft === t }" @click="articleCraft = articleCraft === t ? '' : t; updateArticleTopic()">{{ t }}</span>
+        </div>
+        <div class="guide-tags">
+          <div class="guide-label">📝 角度</div>
+          <span v-for="t in writerAngleTags" :key="t" class="guide-tag tag-pattern" :class="{ active: articleAngle === t }" @click="articleAngle = articleAngle === t ? '' : t; updateArticleTopic()">{{ t }}</span>
+        </div>
+        <button class="random-inspire-btn" @click="randomWriterInspire">🎲 随机给我一个灵感</button>
 
         <!-- 生成文案 -->
         <div v-if="articleContent" class="writer-output">
@@ -150,7 +169,7 @@
     <!-- 纹样放大预览 -->
     <div class="preview-overlay" v-if="previewPatternUrl" @click="previewPatternUrl = null">
       <button class="preview-close" @click="previewPatternUrl = null">✕</button>
-      <img :src="previewPatternUrl" alt="纹样预览" class="preview-img" @click.stop />
+      <img :src="previewPatternUrl" alt="纹样预览" class="preview-img" @click.stop @error="e => e.target.style.display='none'" />
     </div>
   </div>
 </template>
@@ -178,7 +197,37 @@ function requireAuth() {
 }
 
 const topic = ref('')
+const patternTags = ['莲瓣纹', '缠枝纹', '回纹', '蕉叶纹', '云纹', '龙凤纹', '牡丹纹', '团花纹', '冰裂纹', '弦纹', '如意纹']
+const styleTags = ['粉青釉色', '梅子青釉', '青花蓝', '水墨风格', '工笔画风格', '剪纸窗花', '红金配色', '青绿山水']
+const craftTags = ['龙泉青瓷', '景德镇瓷器', '杭州丝绸', '苏绣', '景泰蓝', '东阳木雕', '皮影戏', '中国剪纸', '木版年画']
+function appendTopic(tag) {
+  topic.value = topic.value ? topic.value + ' ' + tag : tag
+}
+function randomInspire() {
+  const p = patternTags[Math.floor(Math.random() * patternTags.length)]
+  const s = styleTags[Math.floor(Math.random() * styleTags.length)]
+  const c = craftTags[Math.floor(Math.random() * craftTags.length)]
+  topic.value = `${c} ${p} ${s}`
+}
 const articleTopic = ref('')
+const articleCraft = ref('')
+const articleAngle = ref('')
+const writerCraftTags = ['龙泉青瓷', '杭州丝绸', '景德镇瓷器', '苏绣', '景泰蓝', '东阳木雕', '宜兴紫砂', '皮影戏', '中国剪纸', '潍坊风筝', '福州脱胎漆器', '木版年画']
+const writerAngleTags = ['历史渊源', '制作工艺', '文化内涵', '纹样赏析', '地域特色', '传承故事', '创新发展', '代表作品']
+function updateArticleTopic() {
+  if (articleCraft.value && articleAngle.value) {
+    articleTopic.value = `介绍${articleCraft.value}的${articleAngle.value}`
+  } else if (articleCraft.value) {
+    articleTopic.value = `介绍${articleCraft.value}`
+  } else {
+    articleTopic.value = ''
+  }
+}
+function randomWriterInspire() {
+  articleCraft.value = writerCraftTags[Math.floor(Math.random() * writerCraftTags.length)]
+  articleAngle.value = writerAngleTags[Math.floor(Math.random() * writerAngleTags.length)]
+  updateArticleTopic()
+}
 
 // 纹样生成
 const patterns = ref([])
@@ -196,11 +245,12 @@ async function generatePatterns() {
   if (!topic.value.trim()) return
   generating.value = true
   patterns.value = []
+  let uploadWarnings = []
   try {
     const tempUrls = await generatePatternImage(topic.value)
     patterns.value = tempUrls
 
-    // 转存到 Supabase Storage 永久保存（临时链接会过期）
+    // 转存到 Supabase Storage 永久保存（DashScope临时链接会过期）
     const permanentUrls = []
     for (let i = 0; i < tempUrls.length; i++) {
       try {
@@ -208,13 +258,24 @@ async function generatePatterns() {
         const permUrl = await uploadImageFromUrl(tempUrls[i], path)
         permanentUrls.push(permUrl)
         saveLocalPatternHistory(topic.value, permUrl)
-      } catch {
-        // 上传失败则回退保存临时链接
+      } catch (err) {
+        console.error(`[纹样] 第${i + 1}张转存失败:`, err.message)
+        uploadWarnings.push(`第${i + 1}张: ${err.message}`)
+        // 回退保存临时链接（标记为临时，显示时提示用户）
         saveLocalPatternHistory(topic.value, tempUrls[i])
       }
     }
     if (permanentUrls.length) patterns.value = permanentUrls
     patternHistory.value = getLocalPatternHistory()
+
+    // 汇总提示上传失败情况
+    if (uploadWarnings.length === tempUrls.length) {
+      alert('⚠️ 所有纹样图片转存失败，当前显示为临时链接，几天后可能失效。\n\n' +
+        '可能原因：\n1. Supabase Storage bucket「images」未创建或权限未配置\n2. 网络连接不稳定\n\n' +
+        '请在 Supabase Dashboard → Storage 中创建名为「images」的公开bucket，并配置 INSERT 和 SELECT 策略。')
+    } else if (uploadWarnings.length > 0) {
+      console.warn(`[纹样] ${uploadWarnings.length}/${tempUrls.length} 张上传失败:`, uploadWarnings.join('; '))
+    }
   } catch (e) {
     logError('create:generatePatterns', e)
     alert('纹样生成失败：' + e.message)
@@ -421,19 +482,49 @@ onMounted(async () => {
 }
 .pattern-input-row input {
   flex: 1;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
   background: var(--paper);
   outline: none;
   color: var(--ink-dark);
   transition: border-color 0.2s;
 }
 .pattern-input-row input:focus { border-color: var(--celadon); }
+
+/* 引导标签 */
+.guide-tags {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin-bottom: 8px; flex-wrap: wrap;
+}
+.guide-label {
+  font-size: 11px; color: var(--ink-light); font-weight: 600;
+  white-space: nowrap; padding-top: 3px; min-width: 48px;
+}
+.guide-tag {
+  font-size: 11px; padding: 4px 10px; border-radius: var(--radius-full);
+  cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  border: 1px solid; user-select: none;
+}
+.guide-tag:active { transform: scale(0.95); }
+.tag-pattern { background: #FDF3E0; color: #9A7B3C; border-color: #E8D5A3; }
+.tag-style { background: var(--celadon-pale); color: var(--celadon-dark); border-color: #C8E6D4; }
+.tag-craft { background: #FFF3E0; color: #E65100; border-color: #FFE0B2; }
+.random-inspire-btn {
+  display: block; margin: 4px auto 0; padding: 8px 20px;
+  border: 1px dashed var(--celadon); border-radius: var(--radius-full);
+  background: transparent; color: var(--celadon-dark);
+  font-size: 13px; cursor: pointer; transition: all 0.15s;
+}
+.random-inspire-btn:active { background: var(--celadon-pale); }
+.guide-tag.active { border-width: 2px; font-weight: 600; }
+.writer-preview-label { font-size: 12px; color: var(--ink-light); flex-shrink: 0; }
+.writer-preview { font-size: 14px; color: var(--ink-dark); font-weight: 500; }
+.writer-preview em { font-style: normal; color: var(--celadon-dark); font-weight: 700; }
 .pattern-input-row input::placeholder { color: var(--ink-disabled); }
 .gen-btn {
-  padding: 10px 20px;
+  padding: 12px 22px;
   background: var(--gradient-brand);
   color: #FFF;
   border: none;
@@ -575,13 +666,16 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   border: 1px solid rgba(0,0,0,0.04);
 }
-.writer-input-row { margin-bottom: var(--space-md); }
+.writer-input-row {
+  display: flex; gap: var(--space-sm);
+  align-items: center; margin-bottom: var(--space-md);
+}
 .writer-input-row input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
   background: var(--paper);
   outline: none;
   color: var(--ink-dark);
@@ -590,30 +684,13 @@ onMounted(async () => {
 }
 .writer-input-row input:focus { border-color: var(--silk-gold); }
 .writer-input-row input::placeholder { color: var(--ink-disabled); }
-.writer-actions-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-md);
-}
-.craft-tag {
-  display: inline-block;
-  font-size: 11px;
-  padding: 4px 12px;
-  background: var(--celadon-pale);
-  border-radius: var(--radius-full);
-  color: var(--celadon-dark);
-  font-weight: 500;
-}
+.preview-row { margin-bottom: 10px; }
 .gen-text-btn {
-  padding: 9px 18px;
+  padding: 12px 20px;
   background: linear-gradient(135deg, var(--silk-gold), #B8994E);
-  color: #FFF;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
+  color: #FFF; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
   transition: opacity 0.2s;
 }
 .gen-text-btn:active { opacity: 0.85; }

@@ -3,6 +3,7 @@
     <div class="page-body" style="padding-top:8px;">
       <!-- 顶部标题 -->
       <div class="home-title">
+        <img src="/logo.png" alt="文脉智学" class="home-logo" />
         <div>
           <h2 class="home-app-name">文脉智学</h2>
           <p class="home-sub">探索传统手工艺的数字之旅</p>
@@ -86,21 +87,73 @@
           </div>
         </div>
 
-        <!-- 金刚区 -->
-        <div class="quick-entry">
-          <div class="quick-item" v-for="craft in featuredCrafts" :key="craft.id" @click="$router.push('/craft/' + craft.id)">
-            <div class="quick-icon" :class="craft.id === 'longquan' ? 'learn' : 'silk'">
-              {{ craft.id === 'longquan' ? '🏺' : '🧵' }}
+        <!-- 文脉时间线 -->
+        <div class="timeline-card">
+          <div class="timeline-label">📜 文脉</div>
+          <div class="timeline-scroll">
+            <div class="timeline-track">
+              <div class="timeline-line"></div>
+              <div
+                v-for="p in timelinePeriods"
+                :key="p.name"
+                class="timeline-node"
+                @click="$router.push('/era/' + encodeURIComponent(p.name))"
+              >
+                <div class="timeline-dot"></div>
+                <div class="timeline-era">{{ p.name }}</div>
+                <div class="timeline-era-wrap">
+                  <span class="timeline-era-icon">{{ p.icon }}</span>
+                  <span class="timeline-era-tag">{{ p.label }}</span>
+                </div>
+              </div>
             </div>
-            <span>{{ craft.name }}</span>
           </div>
-          <div class="quick-item" @click="$router.push('/practice')">
-            <div class="quick-icon practice">✏️</div>
-            <span>AI问答</span>
+        </div>
+
+        <!-- 每日一艺 + 今日一问 -->
+        <div class="daily-row">
+          <div class="daily-craft-card" @click="$router.push('/craft/' + dailyCraft.id)">
+            <div class="daily-craft-badge">📅 每日一艺</div>
+            <div class="daily-craft-icon">{{ catIcon(dailyCraft.category) }}</div>
+            <h4 class="daily-craft-name">{{ dailyCraft.name }}</h4>
+            <p class="daily-craft-brief">{{ dailyCraft.brief?.slice(0, 26) }}…</p>
+            <div class="daily-craft-meta">{{ dailyCraft.region }} · {{ dailyCraft.era }}</div>
+            <span class="daily-craft-btn">📖 开始学习 →</span>
           </div>
-          <div class="quick-item" @click="$router.push('/create')">
-            <div class="quick-icon create">🎨</div>
-            <span>纹样工坊</span>
+
+          <div class="daily-quiz-card" v-if="quizQuestion">
+            <div class="daily-quiz-badge">❓ 今日一问</div>
+            <p class="daily-quiz-question">{{ quizQuestion.question }}</p>
+
+            <!-- 答题前：选项 -->
+            <div class="daily-quiz-body">
+              <div v-if="!quizAnswered" class="daily-quiz-options">
+                <button
+                  v-for="(opt, i) in quizQuestion.options"
+                  :key="i"
+                  class="daily-quiz-option"
+                  @click.stop="selectQuizOption(i)"
+                >{{ opt }}</button>
+              </div>
+
+              <!-- 答题后：解析替换选项 -->
+              <div v-else class="daily-quiz-feedback">
+                <p v-if="quizSelected === quizQuestion.answer" class="quiz-result correct">✅ 回答正确！</p>
+                <p v-else class="quiz-result wrong">❌ 正确答案是「{{ quizQuestion.options[quizQuestion.answer] }}」</p>
+                <p class="daily-quiz-explain">{{ quizQuestion.explanation }}</p>
+                <button class="daily-quiz-next" @click.stop="nextQuizQuestion">🔄 换一题</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 快捷入口横向滑动 -->
+        <div class="quick-scroll">
+          <div class="quick-scroll-track">
+            <div class="quick-item" v-for="entry in quickEntries" :key="entry.label" @click="$router.push(entry.to)">
+              <div class="quick-icon" :class="entry.iconClass">{{ entry.icon }}</div>
+              <span>{{ entry.label }}</span>
+            </div>
           </div>
         </div>
 
@@ -113,10 +166,8 @@
           <button class="carousel-arrow carousel-left" @click="scrollCourses(-1)" :class="{ disabled: coursePage <= 0 }">‹</button>
           <div class="course-track" ref="courseTrackRef">
             <div class="course-card" v-for="course in courses" :key="course.id" @click="openCourse(course)">
-              <div
-                class="course-thumb"
-                :style="thumbnails[course.id] ? { backgroundImage: 'url(' + thumbnails[course.id] + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : { background: course.gradient }"
-              >
+              <div class="course-thumb" :style="{ background: course.gradient }">
+                <img v-if="thumbnails[course.id]" :src="thumbnails[course.id]" referrerpolicy="no-referrer" class="course-cover" @error="e => e.target.hidden = true" />
                 <span v-if="!thumbnails[course.id]" class="course-icon">{{ course.icon }}</span>
                 <span class="duration">{{ course.duration }}</span>
               </div>
@@ -154,32 +205,31 @@
 
     </div>
 
-    <!-- 课程视频播放器 -->
-    <div class="video-overlay" v-if="activeCourse" :class="{ fullscreen: isFullscreen }" @click.self="closePlayer">
-      <div class="video-card" :class="{ fullscreen: isFullscreen }">
-        <div class="video-header" v-show="!isFullscreen">
+    <!-- 课程视频播放器（B站嵌入） -->
+    <div class="video-overlay" v-if="activeCourse" @click.self="closePlayer">
+      <div class="video-card">
+        <div class="video-header">
           <h3>{{ activeCourse.title }}</h3>
           <button @click="closePlayer">✕</button>
         </div>
-        <div class="video-frame" ref="videoFrameRef">
-          <video
-            v-if="activeCourse.videoUrl"
-            ref="videoRef"
-            :src="activeCourse.videoUrl"
-            controls
-            controlslist="nodownload"
-            playsinline
-            @dblclick.prevent="toggleFullscreen"
-            @timeupdate="onTimeUpdate"
-            style="width:100%;height:100%;object-fit:contain"
-          ></video>
+        <div class="video-frame">
+          <iframe
+            v-if="activeCourse.bvid"
+            :src="`//player.bilibili.com/player.html?bvid=${activeCourse.bvid}&page=1&autoplay=0`"
+            scrolling="no"
+            border="0"
+            frameborder="no"
+            framespacing="0"
+            allowfullscreen="true"
+            style="width:100%;height:100%;"
+          ></iframe>
           <div v-else class="video-placeholder">
             <span>{{ activeCourse.icon }}</span>
-            <p>视频源：{{ activeCourse.title }}</p>
-            <p class="video-hint">将 MP4 文件放入 public/videos/ 目录</p>
+            <p>{{ activeCourse.title }}</p>
+            <p class="video-hint">暂无可播放的视频链接</p>
           </div>
         </div>
-        <p class="video-desc" v-show="!isFullscreen">{{ activeCourse.desc }}</p>
+        <p class="video-desc">{{ activeCourse.desc }}</p>
       </div>
     </div>
   </div>
@@ -189,48 +239,49 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import craftsData from '@/data/工艺知识库.json'
-import { getVideoThumbnail } from '@/services/videoThumbnail'
-import { getAllCourseViews, incrementCourseViews, trackActiveDay, saveVideoPosition, getVideoPosition } from '@/services/db'
+import quizData from '@/data/题库.json'
+import { getAllCourseViews, incrementCourseViews, trackActiveDay } from '@/services/db'
+import gsap from 'gsap'
 
 const authStore = useAuthStore()
 
 // ---- 推荐课程 ----
 const courses = ref([
   {
-    id: 1, title: '龙泉青瓷入门：从泥到瓷', icon: '🏺', duration: '8:31',
+    id: 1, title: '龙泉青瓷入门：从泥到瓷', icon: '🏺', duration: '52:18',
     craft: '龙泉青瓷', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #B2DFDB, #80CBC4)',
-    videoUrl: '/videos/longquan-qingci.mp4', desc: '从选泥、拉坯到上釉、烧窑，完整演示龙泉青瓷制作全过程。'
+    bvid: 'BV1kh411r7yU', desc: '青瓷讲堂系列：涵盖龙泉窑历史、粉青/梅子青釉色、哥窑弟窑鉴别、刻划花工艺全解析。'
   },
   {
-    id: 2, title: '杭绣技法：双面绣的秘密', icon: '🧵', duration: '2:39',
+    id: 2, title: '杭绣技法：双面绣的秘密', icon: '🧵', duration: '5:42',
     craft: '杭州丝绸', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #F5EDE0, #E2CB94)',
-    videoUrl: '/videos/hangzhoucixiu.mp4', desc: '杭州刺绣代表性技法双面绣的详细教程，从起针到收针全流程。'
+    bvid: 'BV1oj421R7QT', desc: '省级非遗传承人薛氏刺绣揭秘双面绣核心秘诀—系小针无结无线头，正反两面同样精美。'
   },
   {
-    id: 3, title: '青瓷纹样中的吉祥寓意', icon: '🖌️', duration: '15:20',
+    id: 3, title: '青瓷纹样中的吉祥寓意', icon: '🖌️', duration: '8:06',
     craft: '龙泉青瓷', tagClass: 'tag-vermilion',
     gradient: 'linear-gradient(135deg, #F8CDD0, #E8B4B8)',
-    videoUrl: '', desc: '解读龙泉青瓷常见纹样——莲瓣纹、缠枝纹、回纹等的文化含义。'
+    bvid: 'BV1rb4y1d7nN', desc: '瓷物志：近距离品鉴宋龙泉窑青釉刻莲瓣纹碗，解读莲瓣纹、缠枝纹、回纹的文化含义。'
   },
   {
-    id: 4, title: '景德镇青花瓷绘制技法', icon: '🏺', duration: '22:10',
+    id: 4, title: '景德镇青花瓷绘制技法', icon: '🏺', duration: '7:31',
     craft: '景德镇瓷器', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #B0C4DE, #87CEEB)',
-    videoUrl: '', desc: '从勾线到分水，完整学习景德镇青花瓷传统绘制技法。'
+    bvid: 'BV1VE411D7dz', desc: '《匠心冶陶》纪录片第九集：青花及釉下彩绘—分水技法、勾线点染，完整演示青花绘制全流程。'
   },
   {
-    id: 5, title: '苏绣双面绣针法精讲', icon: '🧵', duration: '18:30',
+    id: 5, title: '苏绣双面绣针法精讲', icon: '🧵', duration: '12:46',
     craft: '苏绣', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #FCE4EC, #F8BBD0)',
-    videoUrl: '', desc: '苏绣大师亲授双面绣核心针法，正反两面完美呈现。'
+    bvid: 'BV1cV411j7B7', desc: '苏绣针法教学系列合集：双面绣兰草、滚针、虚实针、乱针绣等核心针法逐一讲解示范。'
   },
   {
-    id: 6, title: '东阳木雕浮雕入门', icon: '🪚', duration: '25:45',
+    id: 6, title: '东阳木雕浮雕入门', icon: '🪚', duration: '15:20',
     craft: '东阳木雕', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #EDE5D8, #D4C4A8)',
-    videoUrl: '', desc: '从选材到雕刻，系统学习东阳木雕平面浮雕基础技法。'
+    bvid: 'BV1Yh411B7sc', desc: '东阳木雕挂屏《清荷凝香》：樟木独板浅浮雕技法完整演示，涵盖开线条、修光全流程。'
   }
 ])
 const activeCourse = ref(null)
@@ -238,63 +289,60 @@ const courseViews = ref(getAllCourseViews())
 async function openCourse(c) {
   activeCourse.value = c
   if (authStore.isLoggedIn) courseViews.value = { ...courseViews.value, [c.id]: incrementCourseViews(c.id) }
-  await nextTick()
-  const savedPos = getVideoPosition(c.id)
-  if (savedPos > 0 && videoRef.value) {
-    videoRef.value.currentTime = savedPos
-  }
-}
-
-// ---- 全屏播放 ----
-const videoRef = ref(null)
-const videoFrameRef = ref(null)
-const isFullscreen = ref(false)
-
-function toggleFullscreen() {
-  const el = videoFrameRef.value
-  if (!el) return
-  if (!document.fullscreenElement) {
-    el.requestFullscreen().catch(() => {})
-  } else {
-    document.exitFullscreen()
-  }
 }
 
 function closePlayer() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {})
-  }
-  if (activeCourse.value && videoRef.value) {
-    saveVideoPosition(activeCourse.value.id, videoRef.value.currentTime)
-  }
   activeCourse.value = null
 }
 
-function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
-let _learnLastSaveTime = 0
-function onTimeUpdate() {
-  if (!activeCourse.value || !videoRef.value) return
-  const now = Date.now()
-  if (now - _learnLastSaveTime < 5000) return
-  _learnLastSaveTime = now
-  saveVideoPosition(activeCourse.value.id, videoRef.value.currentTime)
-}
-
-// ---- 视频缩略图 ----
+// ---- 课程信息（从B站API获取封面+真实时长） ----
 const thumbnails = ref({})
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return m + ':' + String(s).padStart(2, '0')
+}
+async function fetchBilibiliMeta() {
+  const apiBase = import.meta.env.DEV ? '/api/bilibili' : 'https://api.bilibili.com'
+  for (const course of courses.value) {
+    if (!course.bvid) continue
+    try {
+      const res = await fetch(`${apiBase}/x/web-interface/view?bvid=${course.bvid}`)
+      if (!res.ok) continue
+      const json = await res.json()
+      if (json.data?.pic) {
+        thumbnails.value[course.id] = json.data.pic
+      }
+      if (json.data?.duration) {
+        course.duration = formatDuration(json.data.duration)
+      }
+    } catch { /* 获取失败保持兜底值 */ }
+  }
+}
 onMounted(async () => {
   startHeroTimer()
+  animateHeroContent()
   if (authStore.isLoggedIn) trackActiveDay()
-  document.addEventListener('fullscreenchange', onFullscreenChange)
-  for (const course of courses.value) {
-    if (course.videoUrl) {
-      const thumb = await getVideoThumbnail(course.videoUrl)
-      if (thumb) thumbnails.value[course.id] = thumb
-    }
-  }
+  fetchBilibiliMeta()
+
+  // 文脉时间线入场动画
+  await nextTick()
+  gsap.from('.timeline-node', {
+    opacity: 0, x: 20, duration: 0.5,
+    stagger: 0.06, ease: 'power2.out',
+    delay: 0.3
+  })
+  gsap.from('.timeline-line', {
+    scaleX: 0, duration: 0.8,
+    ease: 'power2.out', delay: 0.3,
+    transformOrigin: 'left center'
+  })
+  // 每日卡片弹入
+  gsap.from('.daily-craft-card', { opacity: 0, y: -16, duration: 0.45, ease: 'back.out(1.4)', delay: 0.5 })
+  gsap.from('.daily-quiz-card', { opacity: 0, y: -16, duration: 0.45, ease: 'back.out(1.4)', delay: 0.6 })
+  // 课程卡片 + 文档列表：延迟入场
+  gsap.from('.course-card', { opacity: 0, y: 20, duration: 0.45, stagger: 0.08, ease: 'power2.out', delay: 0.8 })
+  gsap.from('.doc-item', { opacity: 0, y: 16, duration: 0.4, stagger: 0.06, ease: 'power2.out', delay: 1.0 })
 })
 
 onUnmounted(() => {
@@ -342,14 +390,23 @@ function goToSlide(i) {
   heroReal.value = i
   heroTrack.value = i + 1
   heroTransition.value = true
+  animateHeroContent()
   resetHeroTimer()
 }
 
+function animateHeroContent() {
+  nextTick(() => {
+    const active = document.querySelector('.hero-slide:nth-child(' + (heroTrack.value + 1) + ')')
+    if (!active) return
+    const els = active.querySelectorAll('.hero-icon, h2, p')
+    gsap.fromTo(els, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.35, stagger: 0.08, ease: 'power2.out' })
+  })
+}
 function slideNext() {
   heroTrack.value++
   heroTransition.value = true
   heroReal.value = (heroReal.value + 1) % N
-  // 走到 clone of first 时，瞬跳回真正的第一张
+  animateHeroContent()
   if (heroTrack.value === N + 1) {
     setTimeout(() => {
       heroTransition.value = false
@@ -368,15 +425,83 @@ function resetHeroTimer() {
 function pauseHero() { clearInterval(heroTimer) }
 function resumeHero() { startHeroTimer() }
 
-const featuredCrafts = computed(() => {
+// ---- 文脉时间线（每个时代展示一个代表工艺） ----
+const timelinePeriods = [
+  { name: '新石器', icon: '🧵', label: '良渚丝绸', detail: '4700年前，世界最早的丝织物' },
+  { name: '春秋战国', icon: '🪡', label: '刺绣起源', detail: '锁绣针法出现' },
+  { name: '汉代', icon: '🎭', label: '皮影雏形', detail: '皮影戏与蜀绣并行发展' },
+  { name: '唐代', icon: '🏺', label: '越窑青瓷', detail: '海上丝路，青瓷远销' },
+  { name: '宋代', icon: '🏺', label: '龙泉鼎盛', detail: '粉青梅子青，瓷艺巅峰' },
+  { name: '元代', icon: '🫙', label: '青花兴起', detail: '钴料绘制，龙泉大量外销' },
+  { name: '明代', icon: '🔔', label: '景泰蓝', detail: '掐丝珐琅，紫砂木雕并行' },
+  { name: '清代', icon: '🪡', label: '苏绣巅峰', detail: '双面绣成熟，漆器铁画繁荣' },
+  { name: '现代', icon: '🏛️', label: '非遗传承', detail: '多门工艺入选人类非遗' }
+]
+
+// ---- 每日一艺（按日期伪随机选取） ----
+const categoryIcons = { '陶瓷': '🏺', '织绣': '🧵', '雕刻': '🪚', '金属工艺': '🔔', '漆器': '🏮', '民间美术': '🎨', '民间表演': '🎭', '其他': '📦' }
+function catIcon(cat) { return categoryIcons[cat] || '📖' }
+
+const allCrafts = (() => {
   const result = []
   for (const cat of craftsData) {
     for (const item of cat.items) {
-      if (item.featured) result.push({ ...item, category: cat.category })
+      result.push({ ...item, category: cat.category })
     }
   }
   return result
+})()
+
+const dailyCraft = computed(() => {
+  const today = new Date().toISOString().slice(0, 10)
+  let hash = 0
+  for (let i = 0; i < today.length; i++) { hash = ((hash << 5) - hash) + today.charCodeAt(i); hash |= 0 }
+  return allCrafts[Math.abs(hash) % allCrafts.length]
 })
+
+// ---- 今日一问（按日期选题，不记录） ----
+const quizQuestion = ref(null)
+const quizSelected = ref(-1)
+const quizAnswered = ref(false)
+
+function getTodayQuizIndex() {
+  const today = new Date().toISOString().slice(0, 10)
+  let hash = 0
+  for (let i = 0; i < today.length; i++) { hash = ((hash << 5) - hash) + today.charCodeAt(i); hash |= 0 }
+  return Math.abs(hash) % quizData.length
+}
+
+function pickTodayQuestion() {
+  quizQuestion.value = quizData[getTodayQuizIndex()]
+  quizSelected.value = -1
+  quizAnswered.value = false
+}
+function selectQuizOption(i) {
+  if (quizAnswered.value) return
+  quizSelected.value = i
+  quizAnswered.value = true
+}
+// "换一题"：随机选一题（不受日期限制）
+function nextQuizQuestion() {
+  let idx = Math.floor(Math.random() * quizData.length)
+  if (quizData.length > 1 && idx === getTodayQuizIndex()) {
+    idx = (idx + 1) % quizData.length
+  }
+  quizQuestion.value = quizData[idx]
+  quizSelected.value = -1
+  quizAnswered.value = false
+}
+pickTodayQuestion()
+
+// ---- 快捷入口（横向滑动） ----
+const quickEntries = [
+  { icon: '🏺', label: '龙泉青瓷', to: '/craft/longquan', iconClass: 'celadon' },
+  { icon: '🧵', label: '杭州丝绸', to: '/craft/hangzhou-silk', iconClass: 'silk' },
+  { icon: '✏️', label: 'AI问答', to: '/practice', iconClass: 'practice' },
+  { icon: '🎨', label: '纹样工坊', to: '/create', iconClass: 'create' },
+  { icon: '📹', label: '课程视频', to: '/courses', iconClass: 'video' },
+  { icon: '📖', label: '工艺文档', to: '/crafts', iconClass: 'docs' }
+]
 
 // ---- 搜索历史 ----
 const HISTORY_KEY = 'wenmai_search_history'
@@ -500,9 +625,15 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
 .home-title {
   padding: 0 0 2px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: var(--space-md);
   margin-bottom: var(--space-lg);
+}
+.home-logo {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .home-app-name {
   font-size: 24px;
@@ -637,37 +768,238 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
 .search-item-tag.tag-doc { background: #FDF3E0; color: #B8860B; }
 .search-item-region { font-size: 12px; color: var(--ink-light); margin-left: auto; flex-shrink: 0; }
 
-/* ====== 金刚区 ====== */
-.quick-entry {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
+/* ====== 文脉时间线 ====== */
+.timeline-card {
+  background: linear-gradient(160deg, #FDFAF5 0%, #F8F5EE 50%, #FAF6F0 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(139,119,90,0.1);
+  padding: 14px;
+  margin-bottom: var(--space-lg);
 }
+.timeline-label {
+  font-size: 13px; font-weight: 700; color: var(--silk-gold);
+  font-family: 'Noto Serif SC', serif;
+  letter-spacing: 1px; margin-bottom: var(--space-sm);
+}
+.timeline-scroll {
+  position: relative;
+}
+.timeline-track {
+  display: flex; gap: 0;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  padding: 8px 0 4px;
+  scrollbar-width: none; position: relative;
+}
+.timeline-track::-webkit-scrollbar { display: none; }
+.timeline-line {
+  position: absolute; top: 20px; left: 0;
+  width: 900px; height: 1px;
+  background: linear-gradient(90deg, var(--celadon-light) 0%, var(--celadon) 50%, var(--celadon-light) 100%);
+  pointer-events: none;
+}
+.timeline-node {
+  display: flex; flex-direction: column; align-items: center;
+  flex-shrink: 0; min-width: 96px; padding: 0 4px;
+  cursor: pointer; position: relative; z-index: 1;
+  transition: transform 0.2s;
+}
+.timeline-node:active { transform: scale(0.95); }
+.timeline-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--celadon-light); border: 2px solid var(--card-bg);
+  box-shadow: 0 0 0 1.5px var(--celadon-light);
+  flex-shrink: 0; margin-bottom: 6px;
+}
+.timeline-era {
+  font-size: 11px; font-weight: 600; color: var(--ink-light);
+  font-family: 'Noto Serif SC', serif;
+  margin-bottom: 6px; white-space: nowrap;
+}
+.timeline-era-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; padding: 4px 6px; border-radius: 8px;
+  transition: transform 0.15s, background 0.15s;
+}
+.timeline-era-wrap:hover { transform: scale(1.08); background: var(--celadon-pale); }
+.timeline-era-icon { font-size: 22px; line-height: 1; }
+.timeline-era-tag {
+  font-size: 11px; color: var(--ink-mid); font-weight: 600;
+  white-space: nowrap; font-family: 'Noto Serif SC', serif;
+}
+
+/* ====== 每日一艺 + 今日一问 ====== */
+.daily-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+/* ====== 每日一艺卡片 ====== */
+.daily-craft-card {
+  background: linear-gradient(160deg, #FDF8F0 0%, #F0EBE0 100%);
+  border-radius: var(--radius-md);
+  padding: 16px 14px;
+  display: flex; flex-direction: column; align-items: center;
+  cursor: pointer; border: 1px solid rgba(139,119,90,0.1);
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative; overflow: hidden;
+}
+.daily-craft-card::before {
+  content: ''; position: absolute; top: -16px; right: -16px;
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(184,149,106,0.06);
+}
+.daily-craft-card:active { transform: scale(0.97); }
+.daily-craft-badge {
+  font-size: 13px; font-weight: 700; color: var(--silk-gold);
+  margin-bottom: 10px; letter-spacing: 0.5px;
+}
+.daily-craft-icon {
+  font-size: 40px; margin-bottom: 6px; line-height: 1;
+}
+.daily-craft-name {
+  font-size: 15px; font-weight: 700; color: var(--ink-dark);
+  font-family: 'Noto Serif SC', serif;
+  margin-bottom: 4px;
+}
+.daily-craft-brief {
+  font-size: 11px; color: var(--ink-light); text-align: center;
+  line-height: 1.5; margin-bottom: 6px;
+}
+.daily-craft-meta {
+  font-size: 10px; color: var(--ink-disabled);
+  margin-bottom: 12px;
+}
+.daily-craft-btn {
+  font-size: 12px; font-weight: 600; color: #FFF;
+  background: linear-gradient(135deg, var(--celadon), var(--celadon-dark));
+  padding: 8px 18px; border-radius: var(--radius-full);
+  letter-spacing: 0.5px;
+}
+
+/* ====== 今日一问卡片 ====== */
+.daily-quiz-card {
+  background: linear-gradient(160deg, #F4F9F6 0%, #F0F5F2 50%, #F6F8F4 100%);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  border: 1px solid rgba(74,139,122,0.08);
+  display: flex; flex-direction: column;
+}
+.daily-quiz-badge {
+  font-size: 12px; font-weight: 700; color: var(--celadon-dark);
+  letter-spacing: 0.5px;
+  align-self: flex-start;
+  margin-bottom: 10px;
+}
+.daily-quiz-question {
+  font-size: 15px; font-weight: 600; color: var(--ink-dark);
+  line-height: 1.6; margin-bottom: 14px;
+}
+.daily-quiz-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.daily-quiz-body {
+  min-height: 108px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.daily-quiz-option {
+  padding: 12px 14px; border-radius: var(--radius-sm);
+  font-size: 14px; text-align: center; cursor: pointer;
+  border: 1.5px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--ink-dark);
+  transition: all 0.15s;
+  line-height: 1.4;
+  min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
+}
+.daily-quiz-option:not(.disabled):active {
+  border-color: var(--celadon); background: var(--celadon-pale);
+  transform: scale(0.97);
+}
+.daily-quiz-option.correct {
+  border-color: var(--celadon-dark); background: var(--celadon-pale);
+  color: var(--celadon-dark); font-weight: 600; border-width: 2px;
+}
+.daily-quiz-option.wrong {
+  border-color: var(--vermilion); background: #FCEAE9;
+  color: var(--vermilion); border-width: 2px;
+}
+.daily-quiz-option.disabled { cursor: default; opacity: 0.6; }
+.daily-quiz-feedback {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 12px; background: var(--paper-warm);
+  border-radius: var(--radius-sm); border: 1px solid var(--border-color);
+}
+.quiz-result { font-size: 14px; font-weight: 600; margin: 0; }
+.quiz-result.correct { color: var(--celadon-dark); }
+.quiz-result.wrong { color: var(--vermilion); }
+.daily-quiz-explain {
+  font-size: 13px; color: var(--ink-mid); line-height: 1.6; margin: 0; text-align: center;
+}
+.daily-quiz-next {
+  padding: 8px 20px;
+  border: 1px solid var(--celadon-dark); border-radius: var(--radius-full);
+  background: transparent; font-size: 13px; color: var(--celadon-dark);
+  cursor: pointer; transition: all 0.15s; font-weight: 500;
+}
+.daily-quiz-next:active { background: var(--celadon-pale); }
+
+/* ====== 快捷入口横向滑动 ====== */
+.quick-scroll {
+  margin-bottom: var(--space-sm);
+  position: relative;
+}
+.quick-scroll::before,
+.quick-scroll::after {
+  content: ''; position: absolute; top: 0; bottom: 0; z-index: 1;
+  width: 16px; pointer-events: none;
+}
+.quick-scroll::before {
+  left: 0;
+  background: linear-gradient(to right, var(--paper), transparent);
+}
+.quick-scroll::after {
+  right: 0;
+  background: linear-gradient(to left, var(--paper), transparent);
+}
+.quick-scroll-track {
+  display: flex; gap: var(--space-xs);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  padding: 4px 0;
+  scrollbar-width: none;
+}
+.quick-scroll-track::-webkit-scrollbar { display: none; }
+
 .quick-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 0;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 10px 14px;
   border-radius: var(--radius-md);
   background: var(--card-bg);
   border: 1px solid rgba(0,0,0,0.03);
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  cursor: pointer; flex-shrink: 0;
+  transition: transform 0.15s;
+  scroll-snap-align: start;
+  min-width: 76px;
 }
-.quick-item:active { transform: scale(0.96); }
+.quick-item:active { transform: scale(0.94); }
 .quick-icon {
-  width: 44px; height: 44px;
-  border-radius: 14px;
+  width: 42px; height: 42px;
+  border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
 }
-.quick-icon.learn { background: linear-gradient(135deg, #E8F3ED, #C8E6D4); }
+.quick-icon.celadon { background: linear-gradient(135deg, #E8F3ED, #C8E6D4); }
 .quick-icon.silk { background: linear-gradient(135deg, #FDF3E0, #E8D5A3); }
 .quick-icon.practice { background: linear-gradient(135deg, #FFF3E0, #FFE0B2); }
 .quick-icon.create { background: linear-gradient(135deg, #FCEAE9, #F8CDD0); }
-.quick-item span { font-size: 11px; color: var(--ink-mid); font-weight: 500; }
+.quick-icon.video { background: linear-gradient(135deg, #E8F0FE, #C8DCF8); }
+.quick-icon.docs { background: linear-gradient(135deg, #EDE5D8, #D4C4A8); }
+.quick-item span { font-size: 11px; color: var(--ink-mid); font-weight: 500; white-space: nowrap; }
 
 /* ====== 课程走马灯 ====== */
 .course-carousel {
@@ -709,6 +1041,11 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
   background: var(--paper-warm);
 }
 .course-icon { font-size: 32px; }
+.course-cover {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
 .duration {
   position: absolute;
   bottom: 4px; right: 4px;
@@ -781,7 +1118,6 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
   display: flex; align-items: center; justify-content: center;
   padding: var(--space-lg);
 }
-.video-overlay.fullscreen { background: #000; padding: 0; }
 .video-card {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
@@ -789,7 +1125,6 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
   width: 100%;
   max-width: 480px;
 }
-.video-card.fullscreen { max-width: none; border-radius: 0; background: #000; }
 .video-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: var(--space-md) var(--space-lg);
@@ -806,7 +1141,6 @@ const knowledgeDocs = docDefs.map(({ name, fullDoc }) => {
 .video-frame {
   aspect-ratio: 16/9; background: #000; width: 100%;
 }
-.video-card.fullscreen .video-frame { aspect-ratio: auto; height: 100vh; }
 .video-placeholder {
   width: 100%; height: 100%;
   display: flex; flex-direction: column;

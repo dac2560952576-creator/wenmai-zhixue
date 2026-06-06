@@ -30,7 +30,7 @@
           :class="['picker-image', { selected: isImageSelected(item.id) }]"
           @click="toggleImage(item)"
         >
-          <img :src="item.image_url" :alt="item.topic" />
+          <img :src="item.image_url" :alt="item.topic" @error="e => e.target.style.display='none'" />
           <div class="picker-check">{{ isImageSelected(item.id) ? '✓' : '' }}</div>
         </div>
       </div>

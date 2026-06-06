@@ -15,10 +15,8 @@
       <!-- 课程列表 -->
       <div class="course-grid">
         <div v-for="course in filteredCourses" :key="course.id" class="course-card" @click="openCourse(course)">
-          <div
-            class="course-thumb"
-            :style="thumbnails[course.id] ? { backgroundImage: 'url(' + thumbnails[course.id] + ')', backgroundSize: 'cover', backgroundPosition: 'center' } : { background: course.gradient }"
-          >
+          <div class="course-thumb" :style="{ background: course.gradient }">
+            <img v-if="thumbnails[course.id]" :src="thumbnails[course.id]" referrerpolicy="no-referrer" class="course-cover" @error="e => e.target.hidden = true" />
             <span v-if="!thumbnails[course.id]" class="course-icon">{{ course.icon }}</span>
             <span class="duration">{{ course.duration }}</span>
           </div>
@@ -38,43 +36,41 @@
       </div>
     </div>
 
-    <!-- 视频播放器 -->
-    <div class="video-overlay" v-if="activeCourse" :class="{ fullscreen: isFullscreen }" @click.self="closePlayer">
-      <div class="video-card" :class="{ fullscreen: isFullscreen }">
-        <div class="video-header" v-show="!isFullscreen">
+    <!-- 视频播放器（B站嵌入） -->
+    <div class="video-overlay" v-if="activeCourse" @click.self="closePlayer">
+      <div class="video-card">
+        <div class="video-header">
           <h3>{{ activeCourse.title }}</h3>
           <button @click="closePlayer">✕</button>
         </div>
-        <div class="video-frame" ref="videoFrameRef">
-          <video
-            v-if="activeCourse.videoUrl"
-            ref="videoRef"
-            :src="activeCourse.videoUrl"
-            controls
-            controlslist="nodownload"
-            playsinline
-            @dblclick.prevent="toggleFullscreen"
-            @timeupdate="onTimeUpdate"
-            style="width:100%;height:100%;object-fit:contain"
-          ></video>
+        <div class="video-frame">
+          <iframe
+            v-if="activeCourse.bvid"
+            :src="`//player.bilibili.com/player.html?bvid=${activeCourse.bvid}&page=1&autoplay=0`"
+            scrolling="no"
+            border="0"
+            frameborder="no"
+            framespacing="0"
+            allowfullscreen="true"
+            style="width:100%;height:100%;"
+          ></iframe>
           <div v-else class="video-placeholder">
             <span>{{ activeCourse.icon }}</span>
-            <p>视频源：{{ activeCourse.title }}</p>
-            <p class="video-hint">将 MP4 文件放入 public/videos/ 目录</p>
+            <p>{{ activeCourse.title }}</p>
+            <p class="video-hint">暂无可播放的视频链接</p>
           </div>
         </div>
-        <p class="video-desc" v-show="!isFullscreen">{{ activeCourse.desc }}</p>
+        <p class="video-desc">{{ activeCourse.desc }}</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getVideoThumbnail } from '@/services/videoThumbnail'
-import { getAllCourseViews, incrementCourseViews, saveVideoPosition, getVideoPosition } from '@/services/db'
+import { getAllCourseViews, incrementCourseViews } from '@/services/db'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -86,124 +82,100 @@ const courseViews = ref(getAllCourseViews())
 async function openCourse(c) {
   activeCourse.value = c
   if (authStore.isLoggedIn) courseViews.value = { ...courseViews.value, [c.id]: incrementCourseViews(c.id) }
-  await nextTick()
-  const savedPos = getVideoPosition(c.id)
-  if (savedPos > 0 && videoRef.value) {
-    videoRef.value.currentTime = savedPos
-  }
-}
-
-// ---- 全屏播放 ----
-const videoRef = ref(null)
-const videoFrameRef = ref(null)
-const isFullscreen = ref(false)
-
-function toggleFullscreen() {
-  const el = videoFrameRef.value
-  if (!el) return
-  if (!document.fullscreenElement) {
-    el.requestFullscreen().catch(() => {})
-  } else {
-    document.exitFullscreen()
-  }
 }
 
 function closePlayer() {
-  if (document.fullscreenElement) {
-    document.exitFullscreen().catch(() => {})
-  }
-  if (activeCourse.value && videoRef.value) {
-    saveVideoPosition(activeCourse.value.id, videoRef.value.currentTime)
-  }
   activeCourse.value = null
 }
 
-function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
-let _lastSaveTime = 0
-function onTimeUpdate() {
-  if (!activeCourse.value || !videoRef.value) return
-  const now = Date.now()
-  if (now - _lastSaveTime < 5000) return
-  _lastSaveTime = now
-  saveVideoPosition(activeCourse.value.id, videoRef.value.currentTime)
-}
-
-// ---- 视频缩略图 & 观看次数 ----
+// ---- 课程信息（从B站API获取封面+真实时长） ----
 const thumbnails = ref({})
-onMounted(async () => {
-  document.addEventListener('fullscreenchange', onFullscreenChange)
-
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return m + ':' + String(s).padStart(2, '0')
+}
+async function fetchBilibiliMeta() {
+  const apiBase = import.meta.env.DEV ? '/api/bilibili' : 'https://api.bilibili.com'
+  for (const course of courses.value) {
+    if (!course.bvid) continue
+    try {
+      const res = await fetch(`${apiBase}/x/web-interface/view?bvid=${course.bvid}`)
+      if (!res.ok) continue
+      const json = await res.json()
+      if (json.data?.pic) {
+        thumbnails.value[course.id] = json.data.pic
+      }
+      if (json.data?.duration) {
+        course.duration = formatDuration(json.data.duration)
+      }
+    } catch { /* 获取失败保持兜底值 */ }
+  }
+}
+onMounted(() => {
   // 从学习记录跳转时自动打开指定课程
   const courseId = route.query.open
   if (courseId) {
     const course = courses.value.find(c => c.id === Number(courseId))
     if (course) openCourse(course)
   }
-  for (const course of courses.value) {
-    if (course.videoUrl) {
-      const thumb = await getVideoThumbnail(course.videoUrl)
-      if (thumb) thumbnails.value[course.id] = thumb
-    }
-  }
+  fetchBilibiliMeta()
 })
 
 const courses = ref([
   {
-    id: 1, title: '龙泉青瓷入门：从泥到瓷', icon: '🏺', duration: '8:31',
+    id: 1, title: '龙泉青瓷入门：从泥到瓷', icon: '🏺', duration: '52:18',
     craft: '龙泉青瓷', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #B2DFDB, #80CBC4)',
-    videoUrl: '/videos/longquan-qingci.mp4', desc: '从选泥、拉坯到上釉、烧窑，完整演示龙泉青瓷制作全过程。'
+    bvid: 'BV1kh411r7yU', desc: '青瓷讲堂系列：涵盖龙泉窑历史、粉青/梅子青釉色、哥窑弟窑鉴别、刻划花工艺全解析。'
   },
   {
-    id: 2, title: '杭绣技法：双面绣的秘密', icon: '🧵', duration: '2:39',
+    id: 2, title: '杭绣技法：双面绣的秘密', icon: '🧵', duration: '5:42',
     craft: '杭州丝绸', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #F5EDE0, #E2CB94)',
-    videoUrl: '/videos/hangzhoucixiu.mp4', desc: '杭州刺绣代表性技法双面绣的详细教程，从起针到收针全流程。'
+    bvid: 'BV1oj421R7QT', desc: '省级非遗传承人薛氏刺绣揭秘双面绣核心秘诀——系小针无结无线头，正反两面同样精美。'
   },
   {
-    id: 3, title: '青瓷纹样中的吉祥寓意', icon: '🖌️', duration: '15:20',
+    id: 3, title: '青瓷纹样中的吉祥寓意', icon: '🖌️', duration: '8:06',
     craft: '龙泉青瓷', tagClass: 'tag-vermilion',
     gradient: 'linear-gradient(135deg, #F8CDD0, #E8B4B8)',
-    videoUrl: '', desc: '解读龙泉青瓷常见纹样——莲瓣纹、缠枝纹、回纹等的文化含义。'
+    bvid: 'BV1rb4y1d7nN', desc: '瓷物志：近距离品鉴宋龙泉窑青釉刻莲瓣纹碗，解读莲瓣纹、缠枝纹、回纹的文化含义。'
   },
   {
-    id: 4, title: '景德镇青花瓷绘制技法', icon: '🏺', duration: '22:10',
+    id: 4, title: '景德镇青花瓷绘制技法', icon: '🏺', duration: '7:31',
     craft: '景德镇瓷器', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #B0C4DE, #87CEEB)',
-    videoUrl: '', desc: '从勾线到分水，完整学习景德镇青花瓷传统绘制技法。'
+    bvid: 'BV1VE411D7dz', desc: '《匠心冶陶》纪录片第九集：青花及釉下彩绘——分水技法、勾线点染，完整演示青花绘制全流程。'
   },
   {
-    id: 5, title: '苏绣双面绣精讲', icon: '🧵', duration: '18:30',
+    id: 5, title: '苏绣双面绣精讲', icon: '🧵', duration: '12:46',
     craft: '苏绣', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #FCE4EC, #F8BBD0)',
-    videoUrl: '', desc: '苏绣大师教你双面绣的核心针法，正反两面完美呈现。'
+    bvid: 'BV1cV411j7B7', desc: '苏绣针法教学系列合集：双面绣兰草、滚针、虚实针、乱针绣等核心针法逐一讲解示范。'
   },
   {
-    id: 6, title: '东阳木雕浮雕入门', icon: '🪚', duration: '25:45',
+    id: 6, title: '东阳木雕浮雕入门', icon: '🪚', duration: '15:20',
     craft: '东阳木雕', tagClass: 'tag-gold',
     gradient: 'linear-gradient(135deg, #EDE5D8, #D4C4A8)',
-    videoUrl: '', desc: '从选材到雕刻，系统学习东阳木雕平面浮雕的基础技法。'
+    bvid: 'BV1Yh411B7sc', desc: '东阳木雕挂屏《清荷凝香》：樟木独板浅浮雕技法完整演示，涵盖开线条、修光全流程。'
   },
   {
-    id: 7, title: '景泰蓝掐丝工艺', icon: '🔔', duration: '20:15',
+    id: 7, title: '景泰蓝掐丝工艺', icon: '🔔', duration: '8:45',
     craft: '景泰蓝', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #F0E6D3, #E2C896)',
-    videoUrl: '', desc: '景泰蓝制作中最关键的掐丝环节，弯丝、焊丝全流程。'
+    bvid: 'BV16T4y1u7ur', desc: '景泰蓝掐丝珐琅画基础教程：从起稿到掐丝，粘丝、弯丝技法和工具使用全讲解。'
   },
   {
-    id: 8, title: '宜兴紫砂壶全手工制作', icon: '🫖', duration: '28:50',
+    id: 8, title: '宜兴紫砂壶全手工制作', icon: '🫖', duration: '12:50',
     craft: '宜兴紫砂', tagClass: 'tag-celadon',
     gradient: 'linear-gradient(135deg, #D7CCC8, #BCAAA4)',
-    videoUrl: '', desc: '拍身筒、镶身筒技法，从泥片到成壶完整的紫砂制作工艺。'
+    bvid: 'BV1xi8oe6EfN', desc: '老手艺人全手工制作紫砂壶全过程：拍身筒、开壶口、搓嘴把、上嘴把，108道工序一览。'
   },
   {
-    id: 9, title: '传统剪纸技法入门', icon: '✂️', duration: '10:15',
+    id: 9, title: '传统剪纸技法入门', icon: '✂️', duration: '32:15',
     craft: '中国剪纸', tagClass: 'tag-vermilion',
     gradient: 'linear-gradient(135deg, #FFE0B2, #FFCC80)',
-    videoUrl: '', desc: '阴刻阳刻基础刀法，从简单纹样到复杂图案的剪纸教学。'
+    bvid: 'BV1Ky4y1x7kA', desc: '剪纸基础教学全套：折叠法→剪刀使用→剪纸符号训练→阴刻阳刻技法→综合设计。'
   }
 ])
 
@@ -252,6 +224,11 @@ const filteredCourses = computed(() => {
   background: var(--paper-warm);
 }
 .course-icon { font-size: 36px; }
+.course-cover {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
 .duration {
   position: absolute; bottom: 4px; right: 4px;
   background: rgba(0,0,0,0.55); color: #FFF;
@@ -267,14 +244,12 @@ const filteredCourses = computed(() => {
 .course-meta span { font-size: 11px; color: var(--ink-light); }
 
 /* 视频播放器 */
-.video-overlay.fullscreen { background: #000; padding: 0; }
 .video-overlay {
   position: absolute; inset: 0; z-index: 999;
   background: rgba(0,0,0,0.6);
   display: flex; align-items: center; justify-content: center;
   padding: var(--space-lg);
 }
-.video-card.fullscreen { max-width: none; border-radius: 0; background: #000; }
 .video-card {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
@@ -298,7 +273,6 @@ const filteredCourses = computed(() => {
 .video-frame {
   aspect-ratio: 16/9; background: #000; width: 100%;
 }
-.video-card.fullscreen .video-frame { aspect-ratio: auto; height: 100vh; }
 .video-placeholder {
   width: 100%; height: 100%;
   display: flex; flex-direction: column;

@@ -20,6 +20,14 @@ export default defineConfig({
         headers: {
           'Host': 'dashscope.aliyuncs.com'
         }
+      },
+      '/api/bilibili': {
+        target: 'https://api.bilibili.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bilibili/, ''),
+        headers: {
+          'Referer': 'https://www.bilibili.com/'
+        }
       }
     }
   }
